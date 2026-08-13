@@ -145,7 +145,7 @@ func TestConsistentHashMinimizesRemapping(t *testing.T) {
 	}
 }
 
-func TestConsistentHashFallsBackWhenSelectedOutboundIsDown(t *testing.T) {
+func TestConsistentHashFailoverAndRecovery(t *testing.T) {
 	candidates := []string{"outbound-a", "outbound-b", "outbound-c"}
 	target := consistentHashRoutingContext(
 		net.TCPDestination(net.DomainAddress("example.com"), 443),
@@ -154,11 +154,15 @@ func TestConsistentHashFallsBackWhenSelectedOutboundIsDown(t *testing.T) {
 	selected := new(ConsistentHashStrategy).PickOutboundForContext(candidates, target)
 
 	statuses := make([]*observatory.OutboundStatus, 0, len(candidates))
+	aliveCandidates := make([]string, 0, len(candidates)-1)
 	for _, candidate := range candidates {
 		statuses = append(statuses, &observatory.OutboundStatus{
 			OutboundTag: candidate,
 			Alive:       candidate != selected,
 		})
+		if candidate != selected {
+			aliveCandidates = append(aliveCandidates, candidate)
+		}
 	}
 	strategy := &ConsistentHashStrategy{
 		ctx: context.Background(),
@@ -177,10 +181,15 @@ func TestConsistentHashFallsBackWhenSelectedOutboundIsDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "fallback" {
-		t.Fatalf("命中的主出站 %q 失活后得到 %q，期望 fallback", selected, got)
+	expectedFailover := new(ConsistentHashStrategy).PickOutboundForContext(aliveCandidates, target)
+	if got != expectedFailover {
+		t.Fatalf("命中的主出站 %q 失活后得到 %q，期望转移到存活主节点 %q", selected, got, expectedFailover)
+	}
+	if got == "fallback" {
+		t.Fatalf("仍有存活主节点时不应使用 fallback")
 	}
 
+	// 原主节点恢复后，同一目标应恢复到原有稳定映射。
 	for _, status := range statuses {
 		if status.OutboundTag == selected {
 			status.Alive = true
@@ -192,6 +201,18 @@ func TestConsistentHashFallsBackWhenSelectedOutboundIsDown(t *testing.T) {
 	}
 	if got != selected {
 		t.Fatalf("命中的主出站恢复后得到 %q，期望 %q", got, selected)
+	}
+
+	// 只有全部主节点失活时才使用 fallback。
+	for _, status := range statuses {
+		status.Alive = false
+	}
+	got, err = balancer.PickOutboundForContext(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "fallback" {
+		t.Fatalf("全部主节点失活后得到 %q，期望 fallback", got)
 	}
 }
 

@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"slices"
 	"strings"
 
 	"github.com/xtls/xray-core/common"
@@ -39,17 +38,10 @@ func (s *ConsistentHashStrategy) PickOutboundForContext(candidates []string, ctx
 }
 
 func (s *ConsistentHashStrategy) pickOutbound(candidates []string, target string) string {
-	selected := pickConsistentHashOutbound(target, candidates)
-	if selected == "" {
-		return ""
-	}
-
-	// 主出站失活时不重新散列到其他主候选项，而是返回空标签，
-	// 将故障切换交给 Balancer.fallbackTag 处理。
-	if !slices.Contains(filterAliveOutbounds(s.ctx, s.observatory, candidates), selected) {
-		return ""
-	}
-	return selected
+	// 在存活主节点集合中选择 rendezvous hash 得分最高的节点。
+	// 只有所有主节点均失活时才返回空标签，由 Balancer.fallbackTag 处理。
+	aliveCandidates := filterAliveOutbounds(s.ctx, s.observatory, candidates)
+	return pickConsistentHashOutbound(target, aliveCandidates)
 }
 
 func consistentHashTarget(ctx routing.Context) string {

@@ -9,7 +9,6 @@ import (
 	"github.com/xtls/xray-core/features/extension"
 	"github.com/xtls/xray-core/features/routing"
 	"golang.org/x/net/idna"
-	"golang.org/x/net/publicsuffix"
 )
 
 // ConsistentHashStrategy 使用 rendezvous hash，让同一目标稳定选择同一出站，
@@ -66,8 +65,8 @@ func consistentHashTarget(ctx routing.Context) string {
 	return ""
 }
 
-// consistentHashDomain 将完整域名规范化为可注册根域名（eTLD+1），
-// 使同一站点的不同子域名稳定选择同一出站。无法计算根域名时保留完整域名。
+// consistentHashDomain 规范化完整域名，使大小写、末尾点和 IDN 表示差异
+// 不会改变同一完整域名的出站选择。
 func consistentHashDomain(domain string) string {
 	domain = strings.TrimSuffix(domain, ".")
 	if domain == "" {
@@ -79,10 +78,6 @@ func consistentHashDomain(domain string) string {
 		return strings.ToLower(domain)
 	}
 	domain = strings.ToLower(asciiDomain)
-
-	if registrableDomain, err := publicsuffix.EffectiveTLDPlusOne(domain); err == nil {
-		return registrableDomain
-	}
 	return domain
 }
 

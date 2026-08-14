@@ -66,33 +66,38 @@ func TestConsistentHashTargetCanonicalization(t *testing.T) {
 		t.Fatalf("同一域名的规范化哈希键不一致：%q != %q", upper, lower)
 	}
 	if got, want := consistentHashTarget(domainUpper), "domain\x00example.com"; got != want {
-		t.Fatalf("域名哈希键为 %q，期望可注册根域名 %q", got, want)
+		t.Fatalf("域名哈希键为 %q，期望完整域名 %q", got, want)
 	}
 
+	domainKeys := make(map[string]string)
 	for _, domain := range []string{"api.google.com", "accounts.google.com", "google.com"} {
 		ctx := consistentHashRoutingContext(
 			net.TCPDestination(net.DomainAddress(domain), 443),
 			net.Destination{},
 		)
-		if got, want := consistentHashTarget(ctx), "domain\x00google.com"; got != want {
+		domainKeys[domain] = consistentHashTarget(ctx)
+		if got, want := domainKeys[domain], "domain\x00"+domain; got != want {
 			t.Errorf("域名 %q 的哈希键为 %q，期望 %q", domain, got, want)
 		}
+	}
+	if domainKeys["api.google.com"] == domainKeys["accounts.google.com"] {
+		t.Fatal("不同完整域名不应使用同一个哈希键")
 	}
 
 	publicSuffixDomain := consistentHashRoutingContext(
 		net.TCPDestination(net.DomainAddress("api.example.co.uk"), 443),
 		net.Destination{},
 	)
-	if got, want := consistentHashTarget(publicSuffixDomain), "domain\x00example.co.uk"; got != want {
-		t.Fatalf("多级公共后缀的哈希键为 %q，期望 %q", got, want)
+	if got, want := consistentHashTarget(publicSuffixDomain), "domain\x00api.example.co.uk"; got != want {
+		t.Fatalf("多级公共后缀域名的哈希键为 %q，期望完整域名 %q", got, want)
 	}
 
 	privateSuffixDomain := consistentHashRoutingContext(
 		net.TCPDestination(net.DomainAddress("api.tenant.github.io"), 443),
 		net.Destination{},
 	)
-	if got, want := consistentHashTarget(privateSuffixDomain), "domain\x00tenant.github.io"; got != want {
-		t.Fatalf("私有公共后缀的哈希键为 %q，期望租户根域名 %q", got, want)
+	if got, want := consistentHashTarget(privateSuffixDomain), "domain\x00api.tenant.github.io"; got != want {
+		t.Fatalf("私有公共后缀域名的哈希键为 %q，期望完整域名 %q", got, want)
 	}
 
 	unicodeDomain := consistentHashRoutingContext(
@@ -113,6 +118,14 @@ func TestConsistentHashTargetCanonicalization(t *testing.T) {
 	)
 	if got, want := consistentHashTarget(singleLabelDomain), "domain\x00intranet"; got != want {
 		t.Fatalf("单标签域名的哈希键为 %q，期望回退到完整域名 %q", got, want)
+	}
+
+	hyphenDomain := consistentHashRoutingContext(
+		net.TCPDestination(net.DomainAddress("r2---sn-example.googlevideo.com"), 443),
+		net.Destination{},
+	)
+	if got, want := consistentHashTarget(hyphenDomain), "domain\x00r2---sn-example.googlevideo.com"; got != want {
+		t.Fatalf("特殊连字符域名的哈希键为 %q，期望完整域名 %q", got, want)
 	}
 
 	ipTarget := net.TCPDestination(net.IPAddress([]byte{192, 0, 2, 1}), 443)

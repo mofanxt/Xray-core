@@ -42,20 +42,29 @@ func (m *Manager) Start() error {
 	m.access.Lock()
 	defer m.access.Unlock()
 
-	m.running = true
-
+	var started []outbound.Handler
+	rollback := func(startErr error) error {
+		errs := []error{startErr}
+		for i := len(started) - 1; i >= 0; i-- {
+			errs = append(errs, started[i].Close())
+		}
+		return errors.Combine(errs...)
+	}
 	for _, h := range m.taggedHandler {
 		if err := h.Start(); err != nil {
-			return err
+			return rollback(err)
 		}
+		started = append(started, h)
 	}
 
 	for _, h := range m.untaggedHandlers {
 		if err := h.Start(); err != nil {
-			return err
+			return rollback(err)
 		}
+		started = append(started, h)
 	}
 
+	m.running = true
 	return nil
 }
 
@@ -104,24 +113,26 @@ func (m *Manager) AddHandler(ctx context.Context, handler outbound.Handler) erro
 	m.access.Lock()
 	defer m.access.Unlock()
 
-	m.tagsCache = &sync.Map{}
-
-	if m.defaultHandler == nil {
-		m.defaultHandler = handler
-	}
-
 	tag := handler.Tag()
 	if len(tag) > 0 {
 		if _, found := m.taggedHandler[tag]; found {
 			return errors.New("existing tag found: " + tag)
 		}
+	}
+	if m.running {
+		if err := handler.Start(); err != nil {
+			return err
+		}
+	}
+
+	m.tagsCache = &sync.Map{}
+	if m.defaultHandler == nil {
+		m.defaultHandler = handler
+	}
+	if len(tag) > 0 {
 		m.taggedHandler[tag] = handler
 	} else {
 		m.untaggedHandlers = append(m.untaggedHandlers, handler)
-	}
-
-	if m.running {
-		return handler.Start()
 	}
 
 	return nil
@@ -133,13 +144,16 @@ func (m *Manager) RemoveHandler(ctx context.Context, tag string) error {
 		return common.ErrNoClue
 	}
 	m.access.Lock()
-	defer m.access.Unlock()
-
 	m.tagsCache = &sync.Map{}
 
+	handler := m.taggedHandler[tag]
 	delete(m.taggedHandler, tag)
 	if m.defaultHandler != nil && m.defaultHandler.Tag() == tag {
 		m.defaultHandler = nil
+	}
+	m.access.Unlock()
+	if handler != nil {
+		return handler.Close()
 	}
 
 	return nil

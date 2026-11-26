@@ -30,6 +30,13 @@ type DefaultSystemDialer struct {
 	obm outbound.Manager
 }
 
+type tcpSocketControlKey struct{}
+
+// ContextWithTCPSocketControl 在此 TCP 拨号的常规套接字选项之后执行控制逻辑。
+func ContextWithTCPSocketControl(ctx context.Context, control func(string, string, syscall.RawConn) error) context.Context {
+	return context.WithValue(ctx, tcpSocketControlKey{}, control)
+}
+
 func resolveSrcAddr(network net.Network, src net.Address) net.Addr {
 	if src == nil || src == net.AnyIP {
 		return nil
@@ -142,7 +149,8 @@ func (d *DefaultSystemDialer) Dial(ctx context.Context, src net.Address, dest ne
 		KeepAliveConfig: keepAliveConfig,
 	}
 
-	if sockopt != nil || len(Controllers) > 0 {
+	control, _ := ctx.Value(tcpSocketControlKey{}).(func(string, string, syscall.RawConn) error)
+	if sockopt != nil || len(Controllers) > 0 || control != nil {
 		if sockopt != nil && sockopt.TcpMptcp {
 			dialer.SetMultipathTCP(true)
 		}
@@ -162,7 +170,12 @@ func (d *DefaultSystemDialer) Dial(ctx context.Context, src net.Address, dest ne
 				if _, ok := sockErr.(*BindError); ok {
 					return sockErr
 				}
-				return controlErr
+				if controlErr != nil {
+					return controlErr
+				}
+			}
+			if control != nil {
+				return control(network, address, c)
 			}
 			return nil
 		}

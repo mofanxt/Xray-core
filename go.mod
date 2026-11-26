@@ -5,6 +5,7 @@ go 1.27
 require (
 	github.com/apernet/quic-go v0.63.1-0.20261004180939-a10df75c260c
 	github.com/bufbuild/protocompile v0.14.1
+	github.com/florianl/go-nfqueue/v2 v2.1.0
 	github.com/ghodss/yaml v1.0.1-0.20220118164431-d8423dcdf344
 	github.com/golang/mock v1.7.0-rc.1
 	github.com/google/go-cmp v0.7.0
@@ -48,6 +49,8 @@ require (
 	github.com/klauspost/compress v1.20.4 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
 	github.com/libp2p/go-netroute v0.2.1 // indirect
+	github.com/mdlayher/netlink v1.9.0 // indirect
+	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/molecule-man/go-brrr v1.2.0 // indirect
 	github.com/pion/dtls/v3 v3.1.5 // indirect
 	github.com/pion/logging v0.2.4 // indirect

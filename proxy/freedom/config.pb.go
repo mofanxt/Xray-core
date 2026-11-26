@@ -496,6 +496,58 @@ func (x *FirewallConfig) GetReply() *Reply {
 	return nil
 }
 
+type TCPFingerprintConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Queue         uint32                 `protobuf:"varint,1,opt,name=queue,proto3" json:"queue,omitempty"`
+	TrustedPeers  []string               `protobuf:"bytes,2,rep,name=trusted_peers,json=trustedPeers,proto3" json:"trusted_peers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TCPFingerprintConfig) Reset() {
+	*x = TCPFingerprintConfig{}
+	mi := &file_proxy_freedom_config_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TCPFingerprintConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TCPFingerprintConfig) ProtoMessage() {}
+
+func (x *TCPFingerprintConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_proxy_freedom_config_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TCPFingerprintConfig.ProtoReflect.Descriptor instead.
+func (*TCPFingerprintConfig) Descriptor() ([]byte, []int) {
+	return file_proxy_freedom_config_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *TCPFingerprintConfig) GetQueue() uint32 {
+	if x != nil {
+		return x.Queue
+	}
+	return 0
+}
+
+func (x *TCPFingerprintConfig) GetTrustedPeers() []string {
+	if x != nil {
+		return x.TrustedPeers
+	}
+	return nil
+}
+
 type Config struct {
 	state               protoimpl.MessageState  `protogen:"open.v1"`
 	DomainStrategy      internet.DomainStrategy `protobuf:"varint,1,opt,name=domain_strategy,json=domainStrategy,proto3,enum=xray.transport.internet.DomainStrategy" json:"domain_strategy,omitempty"`
@@ -504,13 +556,14 @@ type Config struct {
 	Fragment            *Fragment               `protobuf:"bytes,5,opt,name=fragment,proto3" json:"fragment,omitempty"`
 	Noises              []*Noise                `protobuf:"bytes,7,rep,name=noises,proto3" json:"noises,omitempty"`
 	Firewall            []*FirewallConfig       `protobuf:"bytes,8,rep,name=firewall,proto3" json:"firewall,omitempty"`
+	TcpFingerprint      *TCPFingerprintConfig   `protobuf:"bytes,9,opt,name=tcp_fingerprint,json=tcpFingerprint,proto3" json:"tcp_fingerprint,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Config) Reset() {
 	*x = Config{}
-	mi := &file_proxy_freedom_config_proto_msgTypes[6]
+	mi := &file_proxy_freedom_config_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -522,7 +575,7 @@ func (x *Config) String() string {
 func (*Config) ProtoMessage() {}
 
 func (x *Config) ProtoReflect() protoreflect.Message {
-	mi := &file_proxy_freedom_config_proto_msgTypes[6]
+	mi := &file_proxy_freedom_config_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -535,7 +588,7 @@ func (x *Config) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Config.ProtoReflect.Descriptor instead.
 func (*Config) Descriptor() ([]byte, []int) {
-	return file_proxy_freedom_config_proto_rawDescGZIP(), []int{6}
+	return file_proxy_freedom_config_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Config) GetDomainStrategy() internet.DomainStrategy {
@@ -576,6 +629,13 @@ func (x *Config) GetNoises() []*Noise {
 func (x *Config) GetFirewall() []*FirewallConfig {
 	if x != nil {
 		return x.Firewall
+	}
+	return nil
+}
+
+func (x *Config) GetTcpFingerprint() *TCPFingerprintConfig {
+	if x != nil {
+		return x.TcpFingerprint
 	}
 	return nil
 }
@@ -623,7 +683,10 @@ const file_proxy_freedom_config_proto_rawDesc = "" +
 	"\tlog_level\x18\x06 \x01(\x0e2\x19.xray.common.log.SeverityH\x00R\blogLevel\x88\x01\x01\x12/\n" +
 	"\x05reply\x18\a \x01(\v2\x19.xray.proxy.freedom.ReplyR\x05replyB\f\n" +
 	"\n" +
-	"_log_level\"\x88\x03\n" +
+	"_log_level\"Q\n" +
+	"\x14TCPFingerprintConfig\x12\x14\n" +
+	"\x05queue\x18\x01 \x01(\rR\x05queue\x12#\n" +
+	"\rtrusted_peers\x18\x02 \x03(\tR\ftrustedPeers\"\xdb\x03\n" +
 	"\x06Config\x12P\n" +
 	"\x0fdomain_strategy\x18\x01 \x01(\x0e2'.xray.transport.internet.DomainStrategyR\x0edomainStrategy\x12Z\n" +
 	"\x14destination_override\x18\x03 \x01(\v2'.xray.proxy.freedom.DestinationOverrideR\x13destinationOverride\x12\x1d\n" +
@@ -631,7 +694,8 @@ const file_proxy_freedom_config_proto_rawDesc = "" +
 	"user_level\x18\x04 \x01(\rR\tuserLevel\x128\n" +
 	"\bfragment\x18\x05 \x01(\v2\x1c.xray.proxy.freedom.FragmentR\bfragment\x121\n" +
 	"\x06noises\x18\a \x03(\v2\x19.xray.proxy.freedom.NoiseR\x06noises\x12>\n" +
-	"\bfirewall\x18\b \x03(\v2\".xray.proxy.freedom.FirewallConfigR\bfirewallJ\x04\b\x06\x10\a*\"\n" +
+	"\bfirewall\x18\b \x03(\v2\".xray.proxy.freedom.FirewallConfigR\bfirewall\x12Q\n" +
+	"\x0ftcp_fingerprint\x18\t \x01(\v2(.xray.proxy.freedom.TCPFingerprintConfigR\x0etcpFingerprintJ\x04\b\x06\x10\a*\"\n" +
 	"\n" +
 	"RuleAction\x12\t\n" +
 	"\x05Allow\x10\x00\x12\t\n" +
@@ -651,7 +715,7 @@ func file_proxy_freedom_config_proto_rawDescGZIP() []byte {
 }
 
 var file_proxy_freedom_config_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proxy_freedom_config_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_proxy_freedom_config_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_proxy_freedom_config_proto_goTypes = []any{
 	(RuleAction)(0),                 // 0: xray.proxy.freedom.RuleAction
 	(*DestinationOverride)(nil),     // 1: xray.proxy.freedom.DestinationOverride
@@ -660,33 +724,35 @@ var file_proxy_freedom_config_proto_goTypes = []any{
 	(*Range)(nil),                   // 4: xray.proxy.freedom.Range
 	(*Reply)(nil),                   // 5: xray.proxy.freedom.Reply
 	(*FirewallConfig)(nil),          // 6: xray.proxy.freedom.FirewallConfig
-	(*Config)(nil),                  // 7: xray.proxy.freedom.Config
-	(*protocol.ServerEndpoint)(nil), // 8: xray.common.protocol.ServerEndpoint
-	(net.Network)(0),                // 9: xray.common.net.Network
-	(*net.PortList)(nil),            // 10: xray.common.net.PortList
-	(*geodata.IPRule)(nil),          // 11: xray.common.geodata.IPRule
-	(log.Severity)(0),               // 12: xray.common.log.Severity
-	(internet.DomainStrategy)(0),    // 13: xray.transport.internet.DomainStrategy
+	(*TCPFingerprintConfig)(nil),    // 7: xray.proxy.freedom.TCPFingerprintConfig
+	(*Config)(nil),                  // 8: xray.proxy.freedom.Config
+	(*protocol.ServerEndpoint)(nil), // 9: xray.common.protocol.ServerEndpoint
+	(net.Network)(0),                // 10: xray.common.net.Network
+	(*net.PortList)(nil),            // 11: xray.common.net.PortList
+	(*geodata.IPRule)(nil),          // 12: xray.common.geodata.IPRule
+	(log.Severity)(0),               // 13: xray.common.log.Severity
+	(internet.DomainStrategy)(0),    // 14: xray.transport.internet.DomainStrategy
 }
 var file_proxy_freedom_config_proto_depIdxs = []int32{
-	8,  // 0: xray.proxy.freedom.DestinationOverride.server:type_name -> xray.common.protocol.ServerEndpoint
+	9,  // 0: xray.proxy.freedom.DestinationOverride.server:type_name -> xray.common.protocol.ServerEndpoint
 	0,  // 1: xray.proxy.freedom.FirewallConfig.action:type_name -> xray.proxy.freedom.RuleAction
-	9,  // 2: xray.proxy.freedom.FirewallConfig.networks:type_name -> xray.common.net.Network
-	10, // 3: xray.proxy.freedom.FirewallConfig.port_list:type_name -> xray.common.net.PortList
-	11, // 4: xray.proxy.freedom.FirewallConfig.ip:type_name -> xray.common.geodata.IPRule
+	10, // 2: xray.proxy.freedom.FirewallConfig.networks:type_name -> xray.common.net.Network
+	11, // 3: xray.proxy.freedom.FirewallConfig.port_list:type_name -> xray.common.net.PortList
+	12, // 4: xray.proxy.freedom.FirewallConfig.ip:type_name -> xray.common.geodata.IPRule
 	4,  // 5: xray.proxy.freedom.FirewallConfig.delay:type_name -> xray.proxy.freedom.Range
-	12, // 6: xray.proxy.freedom.FirewallConfig.log_level:type_name -> xray.common.log.Severity
+	13, // 6: xray.proxy.freedom.FirewallConfig.log_level:type_name -> xray.common.log.Severity
 	5,  // 7: xray.proxy.freedom.FirewallConfig.reply:type_name -> xray.proxy.freedom.Reply
-	13, // 8: xray.proxy.freedom.Config.domain_strategy:type_name -> xray.transport.internet.DomainStrategy
+	14, // 8: xray.proxy.freedom.Config.domain_strategy:type_name -> xray.transport.internet.DomainStrategy
 	1,  // 9: xray.proxy.freedom.Config.destination_override:type_name -> xray.proxy.freedom.DestinationOverride
 	2,  // 10: xray.proxy.freedom.Config.fragment:type_name -> xray.proxy.freedom.Fragment
 	3,  // 11: xray.proxy.freedom.Config.noises:type_name -> xray.proxy.freedom.Noise
 	6,  // 12: xray.proxy.freedom.Config.firewall:type_name -> xray.proxy.freedom.FirewallConfig
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	7,  // 13: xray.proxy.freedom.Config.tcp_fingerprint:type_name -> xray.proxy.freedom.TCPFingerprintConfig
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_proxy_freedom_config_proto_init() }
@@ -701,7 +767,7 @@ func file_proxy_freedom_config_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proxy_freedom_config_proto_rawDesc), len(file_proxy_freedom_config_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

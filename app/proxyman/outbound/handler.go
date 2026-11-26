@@ -251,13 +251,15 @@ func (h *Handler) GetOutbound() proxy.Outbound {
 
 // Start implements common.Runnable.
 func (h *Handler) Start() error {
+	if r, ok := h.proxy.(common.Runnable); ok {
+		return r.Start()
+	}
 	return nil
 }
 
 // Close implements common.Closable.
 func (h *Handler) Close() error {
-	common.Close(h.proxy)
-	return nil
+	return common.Close(h.proxy)
 }
 
 // SenderSettings implements outbound.Handler.

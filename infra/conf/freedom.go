@@ -18,17 +18,23 @@ import (
 )
 
 type FreedomConfig struct {
-	TargetStrategy string                   `json:"targetStrategy"`
-	DomainStrategy string                   `json:"domainStrategy"`
-	Redirect       string                   `json:"redirect"`
-	UserLevel      uint32                   `json:"userLevel"`
-	Fragment       *Fragment                `json:"fragment"`
-	Noise          *Noise                   `json:"noise"`
-	Noises         []*Noise                 `json:"noises"`
-	ProxyProtocol  uint32                   `json:"proxyProtocol"`
-	IPsBlocked     *StringList              `json:"ipsBlocked"`
-	Firewall       []*FreedomFirewallConfig `json:"firewall"`
-	FinalRules     []*FreedomFirewallConfig `json:"finalRules"`
+	TargetStrategy string                       `json:"targetStrategy"`
+	DomainStrategy string                       `json:"domainStrategy"`
+	Redirect       string                       `json:"redirect"`
+	UserLevel      uint32                       `json:"userLevel"`
+	Fragment       *Fragment                    `json:"fragment"`
+	Noise          *Noise                       `json:"noise"`
+	Noises         []*Noise                     `json:"noises"`
+	ProxyProtocol  uint32                       `json:"proxyProtocol"`
+	IPsBlocked     *StringList                  `json:"ipsBlocked"`
+	Firewall       []*FreedomFirewallConfig     `json:"firewall"`
+	FinalRules     []*FreedomFirewallConfig     `json:"finalRules"`
+	TCPFingerprint *FreedomTCPFingerprintConfig `json:"tcpFingerprint"`
+}
+
+type FreedomTCPFingerprintConfig struct {
+	Queue        uint32   `json:"queue"`
+	TrustedPeers []string `json:"trustedPeers"`
 }
 
 type Fragment struct {
@@ -87,6 +93,9 @@ func (c *FreedomConfig) Build() (proto.Message, error) {
 	}
 
 	config := new(freedom.Config)
+	if f := c.TCPFingerprint; f != nil {
+		config.TcpFingerprint = &freedom.TCPFingerprintConfig{Queue: f.Queue, TrustedPeers: f.TrustedPeers}
+	}
 	targetStrategy := c.TargetStrategy
 	if targetStrategy == "" {
 		targetStrategy = c.DomainStrategy

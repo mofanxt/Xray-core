@@ -28,6 +28,7 @@ import (
 	"github.com/xtls/xray-core/features/policy"
 	"github.com/xtls/xray-core/features/stats"
 	"github.com/xtls/xray-core/proxy"
+	"github.com/xtls/xray-core/proxy/freedom/tcpfingerprint"
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/internet"
 	"github.com/xtls/xray-core/transport/internet/stat"
@@ -114,6 +115,7 @@ type Handler struct {
 	firewall        []*Firewall
 	resolveStrategy internet.DomainStrategy
 	usesDialerProxy bool
+	tcpFingerprint  *tcpfingerprint.Manager
 }
 
 func buildRule(config *FirewallConfig) (*Firewall, error) {
@@ -219,6 +221,16 @@ func (h *Handler) matchRule(network net.Network, address net.Address, port net.P
 
 // Init initializes the Handler with necessary parameters.
 func (h *Handler) Init(config *Config, pm policy.Manager) error {
+	if f := config.GetTcpFingerprint(); f != nil {
+		if h.usesDialerProxy {
+			return errors.New("tcpFingerprint needs a direct Freedom socket")
+		}
+		manager, err := tcpfingerprint.New(f.Queue, f.TrustedPeers)
+		if err != nil {
+			return err
+		}
+		h.tcpFingerprint = manager
+	}
 	h.config = config
 	h.policyManager = pm
 	if h.usesDialerProxy { // freedom is not the final outbound, firewall does not apply
@@ -234,6 +246,20 @@ func (h *Handler) Init(config *Config, pm policy.Manager) error {
 			return errors.New("failed to build firewall rule").Base(err)
 		}
 		h.firewall = append(h.firewall, rule)
+	}
+	return nil
+}
+
+func (h *Handler) Start() error {
+	if h.tcpFingerprint != nil {
+		return h.tcpFingerprint.Start()
+	}
+	return nil
+}
+
+func (h *Handler) Close() error {
+	if h.tcpFingerprint != nil {
+		return h.tcpFingerprint.Close()
 	}
 	return nil
 }
@@ -361,6 +387,11 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 	var conn stat.Connection
 	var blockedDest *net.Destination
 	var blockedRule *Firewall
+	var fingerprint *tcpfingerprint.Fingerprint
+	if h.tcpFingerprint != nil && destination.Network == net.Network_TCP &&
+		inbound != nil && inbound.Name == "vless" && inbound.User != nil {
+		fingerprint = h.tcpFingerprint.Read(inbound.Conn)
+	}
 	err := retry.ExponentialBackoff(5, 100).On(func() error {
 		if destination.Address.Family().IsDomain() {
 			if defaultRule != nil || len(h.firewall) > 0 {
@@ -407,7 +438,18 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 			}
 		}
 
-		rawConn, err := dialer.Dial(ctx, destination)
+		dialCtx := ctx
+		var release func(net.Conn)
+		if fingerprint != nil {
+			if control, done := h.tcpFingerprint.SocketControl(fingerprint); control != nil {
+				dialCtx = internet.ContextWithTCPSocketControl(ctx, control)
+				release = done
+			}
+		}
+		rawConn, err := dialer.Dial(dialCtx, destination)
+		if release != nil {
+			release(stat.TryUnwrapStatsConn(rawConn))
+		}
 		if err != nil {
 			return err
 		}

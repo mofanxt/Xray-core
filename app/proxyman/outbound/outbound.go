@@ -2,7 +2,9 @@ package outbound
 
 import (
 	"context"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -20,14 +22,13 @@ type Manager struct {
 	taggedHandler    map[string]outbound.Handler
 	untaggedHandlers []outbound.Handler
 	running          bool
-	tagsCache        *sync.Map
+	tagsCache        sync.Map
 }
 
 // New creates a new Manager.
 func New(ctx context.Context, config *proxyman.OutboundConfig) (*Manager, error) {
 	m := &Manager{
 		taggedHandler: make(map[string]outbound.Handler),
-		tagsCache:     &sync.Map{},
 	}
 	return m, nil
 }
@@ -46,7 +47,7 @@ func (m *Manager) Start() error {
 	rollback := func(startErr error) error {
 		errs := []error{startErr}
 		for i := len(started) - 1; i >= 0; i-- {
-			errs = append(errs, started[i].Close())
+			errs = append(errs, stopOutboundRuntime(started[i]))
 		}
 		return errors.Combine(errs...)
 	}
@@ -125,7 +126,6 @@ func (m *Manager) AddHandler(ctx context.Context, handler outbound.Handler) erro
 		}
 	}
 
-	m.tagsCache = &sync.Map{}
 	if m.defaultHandler == nil {
 		m.defaultHandler = handler
 	}
@@ -134,6 +134,7 @@ func (m *Manager) AddHandler(ctx context.Context, handler outbound.Handler) erro
 	} else {
 		m.untaggedHandlers = append(m.untaggedHandlers, handler)
 	}
+	m.tagsCache.Clear()
 
 	return nil
 }
@@ -144,19 +145,14 @@ func (m *Manager) RemoveHandler(ctx context.Context, tag string) error {
 		return common.ErrNoClue
 	}
 	m.access.Lock()
-	m.tagsCache = &sync.Map{}
-
+	defer m.access.Unlock()
 	handler := m.taggedHandler[tag]
 	delete(m.taggedHandler, tag)
 	if m.defaultHandler != nil && m.defaultHandler.Tag() == tag {
 		m.defaultHandler = nil
 	}
-	m.access.Unlock()
-	if handler != nil {
-		return handler.Close()
-	}
-
-	return nil
+	m.tagsCache.Clear()
+	return stopOutboundRuntime(handler)
 }
 
 // ListHandlers implements outbound.Manager.
@@ -176,9 +172,15 @@ func (m *Manager) ListHandlers(ctx context.Context) []outbound.Handler {
 
 // Select implements outbound.HandlerSelector.
 func (m *Manager) Select(selectors []string) []string {
-	key := strings.Join(selectors, ",")
+	var encoded strings.Builder
+	for _, selector := range selectors {
+		encoded.WriteString(strconv.Itoa(len(selector)))
+		encoded.WriteByte(':')
+		encoded.WriteString(selector)
+	}
+	key := encoded.String()
 	if cache, ok := m.tagsCache.Load(key); ok {
-		return cache.([]string)
+		return slices.Clone(cache.([]string))
 	}
 
 	m.access.RLock()
@@ -198,7 +200,7 @@ func (m *Manager) Select(selectors []string) []string {
 	sort.Strings(tags)
 	m.tagsCache.Store(key, tags)
 
-	return tags
+	return slices.Clone(tags)
 }
 
 func init() {

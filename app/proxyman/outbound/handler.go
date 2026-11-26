@@ -249,10 +249,16 @@ func (h *Handler) GetOutbound() proxy.Outbound {
 	return h.proxy
 }
 
+// outboundRuntime 管理需要随出站注册和移除的额外资源。
+type outboundRuntime interface {
+	StartOutbound() error
+	StopOutbound() error
+}
+
 // Start implements common.Runnable.
 func (h *Handler) Start() error {
-	if r, ok := h.proxy.(common.Runnable); ok {
-		return r.Start()
+	if runtime, ok := h.proxy.(outboundRuntime); ok {
+		return runtime.StartOutbound()
 	}
 	return nil
 }
@@ -260,6 +266,16 @@ func (h *Handler) Start() error {
 // Close implements common.Closable.
 func (h *Handler) Close() error {
 	return common.Close(h.proxy)
+}
+
+// stopOutboundRuntime 只释放主动注册的额外运行资源，保留已有出站的数据流。
+func stopOutboundRuntime(handler outbound.Handler) error {
+	if h, ok := handler.(*Handler); ok {
+		if runtime, ok := h.proxy.(outboundRuntime); ok {
+			return runtime.StopOutbound()
+		}
+	}
+	return nil
 }
 
 // SenderSettings implements outbound.Handler.

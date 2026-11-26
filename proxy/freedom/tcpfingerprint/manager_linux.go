@@ -194,23 +194,7 @@ func (b *linuxBackend) SocketControl(f *Fingerprint) (func(string, string, sysca
 		}
 		var err error
 		if controlErr := socket.Control(func(fd uintptr) {
-			// 已有策略路由标记的连接继续使用原生 SYN。
-			current, getErr := unix.GetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_MARK)
-			if getErr != nil || current != 0 {
-				return
-			}
-			if setErr := unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_MARK, int(mark)); setErr != nil {
-				return
-			}
-			if clamp != 0 {
-				window, getErr := unix.GetsockoptInt(int(fd), unix.IPPROTO_TCP, unix.TCP_WINDOW_CLAMP)
-				if getErr == nil && (window == 0 || window > clamp) {
-					getErr = unix.SetsockoptInt(int(fd), unix.IPPROTO_TCP, unix.TCP_WINDOW_CLAMP, clamp)
-				}
-				if getErr != nil {
-					err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_MARK, 0)
-				}
-			}
+			err = prepareSocket(int(fd), int(mark), clamp)
 		}); controlErr != nil {
 			return controlErr
 		}
@@ -232,4 +216,46 @@ func (b *linuxBackend) SocketControl(f *Fingerprint) (func(string, string, sysca
 		}
 	}
 	return control, release
+}
+
+func prepareSocket(fd, mark, clamp int) error {
+	// 策略路由或 MPTCP 套接字继续使用内核原有的握手方式。
+	protocol, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_PROTOCOL)
+	if err != nil || protocol != unix.IPPROTO_TCP {
+		return nil
+	}
+	current, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_MARK)
+	if err != nil || current != 0 {
+		return nil
+	}
+	fastOpen, err := unix.GetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_FASTOPEN_CONNECT)
+	if err != nil && !errors.Is(err, unix.ENOPROTOOPT) {
+		return nil
+	}
+	var window int
+	if clamp != 0 {
+		window, err = unix.GetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_WINDOW_CLAMP)
+		if err != nil {
+			return nil
+		}
+	}
+	if err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_MARK, mark); err != nil {
+		return nil
+	}
+	// Fast Open 命中缓存时，首次写入才会发送 SYN；拨号返回时标记已释放。
+	if fastOpen != 0 {
+		if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_FASTOPEN_CONNECT, 0); err != nil {
+			return unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_MARK, 0)
+		}
+	}
+	if clamp != 0 && (window == 0 || window > clamp) {
+		if err := unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_WINDOW_CLAMP, clamp); err != nil {
+			clearErr := unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_MARK, 0)
+			if fastOpen != 0 {
+				return errors.Join(clearErr, unix.SetsockoptInt(fd, unix.IPPROTO_TCP, unix.TCP_FASTOPEN_CONNECT, fastOpen))
+			}
+			return clearErr
+		}
+	}
+	return nil
 }

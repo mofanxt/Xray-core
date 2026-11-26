@@ -250,7 +250,7 @@ func (h *Handler) Init(config *Config, pm policy.Manager) error {
 	return nil
 }
 
-func (h *Handler) Start() error {
+func (h *Handler) StartOutbound() error {
 	if h.tcpFingerprint != nil {
 		return h.tcpFingerprint.Start()
 	}
@@ -258,6 +258,10 @@ func (h *Handler) Start() error {
 }
 
 func (h *Handler) Close() error {
+	return h.StopOutbound()
+}
+
+func (h *Handler) StopOutbound() error {
 	if h.tcpFingerprint != nil {
 		return h.tcpFingerprint.Close()
 	}
